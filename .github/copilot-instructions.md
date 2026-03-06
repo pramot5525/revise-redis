@@ -26,27 +26,27 @@ This repository is a **CRUD News API** built with **Go Fiber**, following **Hexa
 ┌─────────────────────────────────────────────┐
 │               Primary Adapters              │
 │         (Driving — HTTP / Fiber)            │
-│   internal/adapters/primary/http/           │
+│   internal/adapters/http/                   │
 │     handler/news_handler.go                 │
 │     router/router.go                        │
 └──────────────────┬──────────────────────────┘
                    │ uses input port
 ┌──────────────────▼──────────────────────────┐
-│                 Core                        │
-│  internal/core/                             │
-│    domain/news.go          ← entity         │
-│    ports/input/            ← input port     │
-│      news_service.go       (interface)      │
-│    ports/output/           ← output ports   │
-│      news_repository.go    (interface)      │
-│      news_cache.go         (interface)      │
-│    service/news_service.go ← implementation │
+│           Application (Use Cases)           │
+│  internal/app/                              │
+│    port/news_service.go    ← input port     │
+│    port/news_repository.go ← output port    │
+│    port/news_cache.go      ← output port    │
+│    news_service.go         ← implementation │
+│                                             │
+│  internal/domain/                           │
+│    news.go                 ← entity         │
 └──────────────────┬──────────────────────────┘
                    │ uses output ports
 ┌──────────────────▼──────────────────────────┐
 │              Secondary Adapters             │
 │        (Driven — Postgres / Redis)          │
-│   internal/adapters/secondary/              │
+│   internal/adapters/                        │
 │     postgres/news_repository.go             │
 │     redis/news_cache.go                     │
 └─────────────────────────────────────────────┘
@@ -59,36 +59,31 @@ This repository is a **CRUD News API** built with **Go Fiber**, following **Hexa
 ```
 revise-redis/
 ├── cmd/
-│   └── main.go                          # Composition root — wires all layers
+│   └── main.go                        # Composition root — wires all layers
 ├── config/
-│   └── config.go                        # Env/config loader
+│   └── config.go                      # Env/config loader
 ├── infrastructure/
-│   ├── db/postgres.go                   # GORM + PostgreSQL connection
-│   └── cache/redis.go                   # go-redis client setup
+│   ├── db/postgres.go                 # GORM + PostgreSQL connection
+│   └── cache/redis.go                 # go-redis client setup
 ├── internal/
-│   ├── core/
-│   │   ├── domain/
-│   │   │   └── news.go                  # Pure domain entity (no framework deps)
-│   │   ├── ports/
-│   │   │   ├── input/
-│   │   │   │   └── news_service.go      # Input port interface
-│   │   │   └── output/
-│   │   │       ├── news_repository.go   # Output port interface (persistence)
-│   │   │       └── news_cache.go        # Output port interface (cache)
-│   │   └── service/
-│   │       └── news_service.go          # Core business logic
+│   ├── domain/
+│   │   └── news.go                    # Pure domain entity (no framework deps)
+│   ├── app/
+│   │   ├── port/
+│   │   │   ├── news_service.go        # Input port interface
+│   │   │   ├── news_repository.go     # Output port interface (persistence)
+│   │   │   └── news_cache.go          # Output port interface (cache)
+│   │   └── news_service.go            # Use case implementation
 │   └── adapters/
-│       ├── primary/
-│       │   └── http/
-│       │       ├── handler/
-│       │       │   └── news_handler.go  # Fiber HTTP handlers
-│       │       └── router/
-│       │           └── router.go        # Route registration
-│       └── secondary/
-│           ├── postgres/
-│           │   └── news_repository.go   # GORM implementation of output port
-│           └── redis/
-│               └── news_cache.go        # Redis implementation of output port
+│       ├── http/
+│       │   ├── handler/
+│       │   │   └── news_handler.go    # Fiber HTTP handlers (driving)
+│       │   └── router/
+│       │       └── router.go          # Route registration
+│       ├── postgres/
+│       │   └── news_repository.go     # GORM implementation of output port
+│       └── redis/
+│           └── news_cache.go          # Redis implementation of output port
 ├── docker-compose.yml
 ├── Dockerfile
 ├── .air.toml
@@ -118,9 +113,9 @@ The domain entity has **no GORM tags** and **no framework dependencies**. The Po
 
 ## Ports
 
-### Input port (primary)
+### Input port
 ```go
-// internal/core/ports/input/news_service.go
+// internal/app/port/news_service.go
 type NewsService interface {
     GetAll() ([]domain.News, error)
     GetByID(id uint) (*domain.News, error)
@@ -130,12 +125,12 @@ type NewsService interface {
 }
 ```
 
-### Output ports (secondary)
+### Output ports
 ```go
-// internal/core/ports/output/news_repository.go
+// internal/app/port/news_repository.go
 type NewsRepository interface { ... }
 
-// internal/core/ports/output/news_cache.go
+// internal/app/port/news_cache.go
 type NewsCache interface { ... }
 ```
 
@@ -217,13 +212,13 @@ REDIS_TTL=300
 
 ## Coding Conventions
 
-- Domain entity (`internal/core/domain/`) must have **zero** framework or driver imports
-- Input port interface lives in `internal/core/ports/input/`
-- Output port interfaces live in `internal/core/ports/output/`
-- Core service depends **only on port interfaces**, never on concrete adapters
+- Domain entity (`internal/domain/`) must have **zero** framework or driver imports
+- Input port interface lives in `internal/app/port/`
+- Output port interfaces live in `internal/app/port/` (same package)
+- Core service (`internal/app/`) depends **only on port interfaces**, never on concrete adapters
 - Adapters import the domain but the domain never imports adapters
 - GORM models are private and live **inside** the postgres adapter package
-- Cache read/write/invalidation logic lives **only** in the core service
+- Cache read/write/invalidation logic lives **only** in the core service (`internal/app/`)
 - All handlers return `{ "success": bool, "data": ..., "message": "..." }`
 - Use `context.Background()` in adapter methods for Redis calls
 - Composition root (`cmd/main.go`) is the only place that imports all layers

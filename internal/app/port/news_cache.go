@@ -1,12 +1,12 @@
-package output
+package port
 
 import (
 	"time"
 
-	"github.com/revise-redis/internal/core/domain"
+	"github.com/revise-redis/internal/domain"
 )
 
-// NewsCache is the secondary (driven) port for caching.
+// NewsCache is the output port for caching.
 type NewsCache interface {
 	GetAll() ([]domain.News, error)
 	SetAll(news []domain.News, ttl time.Duration) error

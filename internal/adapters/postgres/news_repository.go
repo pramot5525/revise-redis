@@ -1,11 +1,11 @@
 package postgres
 
 import (
-	"github.com/revise-redis/internal/core/domain"
+	"github.com/revise-redis/internal/domain"
 	"gorm.io/gorm"
 )
 
-// newsModel is the GORM model — kept separate from the domain entity.
+// newsModel is the internal GORM model — never exposed outside this package.
 type newsModel struct {
 	gorm.Model
 	Title   string
@@ -35,7 +35,7 @@ func toDomain(m *newsModel) *domain.News {
 	}
 }
 
-// NewsRepository is the Postgres secondary adapter.
+// NewsRepository implements port.NewsRepository using GORM + PostgreSQL.
 type NewsRepository struct {
 	db *gorm.DB
 }
@@ -45,12 +45,12 @@ func NewNewsRepository(db *gorm.DB) *NewsRepository {
 }
 
 func (r *NewsRepository) FindAll() ([]domain.News, error) {
-	var models []newsModel
-	if err := r.db.Order("created_at desc").Find(&models).Error; err != nil {
+	var rows []newsModel
+	if err := r.db.Order("created_at desc").Find(&rows).Error; err != nil {
 		return nil, err
 	}
-	news := make([]domain.News, len(models))
-	for i, m := range models {
+	news := make([]domain.News, len(rows))
+	for i, m := range rows {
 		m := m
 		news[i] = *toDomain(&m)
 	}
@@ -77,8 +77,7 @@ func (r *NewsRepository) Create(n *domain.News) error {
 }
 
 func (r *NewsRepository) Update(n *domain.News) error {
-	m := toModel(n)
-	return r.db.Save(m).Error
+	return r.db.Save(toModel(n)).Error
 }
 
 func (r *NewsRepository) Delete(id uint) error {

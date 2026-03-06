@@ -9,11 +9,11 @@ import (
 	"github.com/revise-redis/config"
 	infraCache "github.com/revise-redis/infrastructure/cache"
 	infraDB "github.com/revise-redis/infrastructure/db"
-	"github.com/revise-redis/internal/adapters/primary/http/handler"
-	"github.com/revise-redis/internal/adapters/primary/http/router"
-	pgadapter "github.com/revise-redis/internal/adapters/secondary/postgres"
-	redisadapter "github.com/revise-redis/internal/adapters/secondary/redis"
-	"github.com/revise-redis/internal/core/service"
+	"github.com/revise-redis/internal/adapters/http/handler"
+	"github.com/revise-redis/internal/adapters/http/router"
+	pgadapter "github.com/revise-redis/internal/adapters/postgres"
+	redisadapter "github.com/revise-redis/internal/adapters/redis"
+	"github.com/revise-redis/internal/app"
 	"gorm.io/gorm"
 )
 
@@ -47,14 +47,14 @@ func main() {
 		log.Fatalf("redis: %v", err)
 	}
 
-	// Secondary adapters (driven)
+	// Secondary adapters (driven — implement output ports)
 	newsRepo := pgadapter.NewNewsRepository(gormDB)
 	newsCache := redisadapter.NewNewsCache(redisClient)
 
-	// Core service
-	newsSvc := service.NewNewsService(newsRepo, newsCache, cfg.RedisTTL)
+	// Use case (application layer)
+	newsSvc := app.NewNewsService(newsRepo, newsCache, cfg.RedisTTL)
 
-	// Primary adapters (driving)
+	// Primary adapters (driving — implement HTTP interface)
 	newsHandler := handler.NewNewsHandler(newsSvc)
 
 	// Fiber app

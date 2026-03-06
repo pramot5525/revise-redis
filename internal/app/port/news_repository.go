@@ -1,8 +1,8 @@
-package output
+package port
 
-import "github.com/revise-redis/internal/core/domain"
+import "github.com/revise-redis/internal/domain"
 
-// NewsRepository is the secondary (driven) port for persistence.
+// NewsRepository is the output port for persistence.
 type NewsRepository interface {
 	FindAll() ([]domain.News, error)
 	FindByID(id uint) (*domain.News, error)

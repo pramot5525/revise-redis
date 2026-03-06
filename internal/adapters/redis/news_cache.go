@@ -7,7 +7,7 @@ import (
 	"time"
 
 	goredis "github.com/redis/go-redis/v9"
-	"github.com/revise-redis/internal/core/domain"
+	"github.com/revise-redis/internal/domain"
 )
 
 const (
@@ -15,7 +15,7 @@ const (
 	keyPrefix = "news:"
 )
 
-// NewsCache is the Redis secondary adapter.
+// NewsCache implements port.NewsCache using Redis.
 type NewsCache struct {
 	client *goredis.Client
 }
@@ -30,10 +30,7 @@ func (c *NewsCache) GetAll() ([]domain.News, error) {
 		return nil, err
 	}
 	var news []domain.News
-	if err := json.Unmarshal(data, &news); err != nil {
-		return nil, err
-	}
-	return news, nil
+	return news, json.Unmarshal(data, &news)
 }
 
 func (c *NewsCache) SetAll(news []domain.News, ttl time.Duration) error {
@@ -50,10 +47,7 @@ func (c *NewsCache) GetByID(id uint) (*domain.News, error) {
 		return nil, err
 	}
 	var news domain.News
-	if err := json.Unmarshal(data, &news); err != nil {
-		return nil, err
-	}
-	return &news, nil
+	return &news, json.Unmarshal(data, &news)
 }
 
 func (c *NewsCache) SetByID(news *domain.News, ttl time.Duration) error {

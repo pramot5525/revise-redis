@@ -4,15 +4,15 @@ import (
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/revise-redis/internal/core/domain"
-	"github.com/revise-redis/internal/core/ports/input"
+	"github.com/revise-redis/internal/app/port"
+	"github.com/revise-redis/internal/domain"
 )
 
 type NewsHandler struct {
-	svc input.NewsService
+	svc port.NewsService
 }
 
-func NewNewsHandler(svc input.NewsService) *NewsHandler {
+func NewNewsHandler(svc port.NewsService) *NewsHandler {
 	return &NewsHandler{svc: svc}
 }
 

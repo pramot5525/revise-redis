@@ -2,7 +2,7 @@ package router
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/revise-redis/internal/adapters/primary/http/handler"
+	"github.com/revise-redis/internal/adapters/http/handler"
 )
 
 func Register(app *fiber.App, h *handler.NewsHandler) {
