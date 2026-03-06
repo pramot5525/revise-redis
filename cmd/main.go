@@ -6,49 +6,63 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
-	"github.com/revise-redis/cache"
 	"github.com/revise-redis/config"
-	"github.com/revise-redis/db"
-	"github.com/revise-redis/handler"
-	"github.com/revise-redis/models"
-	"github.com/revise-redis/repository"
-	"github.com/revise-redis/router"
-	"github.com/revise-redis/service"
+	infraCache "github.com/revise-redis/infrastructure/cache"
+	infraDB "github.com/revise-redis/infrastructure/db"
+	"github.com/revise-redis/internal/adapters/primary/http/handler"
+	"github.com/revise-redis/internal/adapters/primary/http/router"
+	pgadapter "github.com/revise-redis/internal/adapters/secondary/postgres"
+	redisadapter "github.com/revise-redis/internal/adapters/secondary/redis"
+	"github.com/revise-redis/internal/core/service"
+	"gorm.io/gorm"
 )
+
+// migrateModel is the GORM model used only for schema migration.
+type migrateModel struct {
+	gorm.Model
+	Title   string
+	Content string
+	Author  string
+}
+
+func (migrateModel) TableName() string { return "news" }
 
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("failed to load config: %v", err)
+		log.Fatalf("config: %v", err)
 	}
 
-	// Database
-	gormDB, err := db.NewPostgres(cfg)
+	// Infrastructure — connections
+	gormDB, err := infraDB.NewPostgres(cfg)
 	if err != nil {
-		log.Fatalf("failed to connect to postgres: %v", err)
+		log.Fatalf("postgres: %v", err)
 	}
-	if err := gormDB.AutoMigrate(&models.News{}); err != nil {
-		log.Fatalf("failed to auto-migrate: %v", err)
+	if err := gormDB.AutoMigrate(&migrateModel{}); err != nil {
+		log.Fatalf("migrate: %v", err)
 	}
 
-	// Redis
-	rdb, err := cache.NewRedis(cfg)
+	redisClient, err := infraCache.NewRedis(cfg)
 	if err != nil {
-		log.Fatalf("failed to connect to redis: %v", err)
+		log.Fatalf("redis: %v", err)
 	}
 
-	// Layers
-	newsRepo := repository.NewNewsRepository(gormDB)
-	newsSvc := service.NewNewsService(newsRepo, rdb, cfg.RedisTTL)
+	// Secondary adapters (driven)
+	newsRepo := pgadapter.NewNewsRepository(gormDB)
+	newsCache := redisadapter.NewNewsCache(redisClient)
+
+	// Core service
+	newsSvc := service.NewNewsService(newsRepo, newsCache, cfg.RedisTTL)
+
+	// Primary adapters (driving)
 	newsHandler := handler.NewNewsHandler(newsSvc)
 
 	// Fiber app
 	app := fiber.New()
 	app.Use(logger.New())
 	app.Use(recover.New())
-
 	router.Register(app, newsHandler)
 
-	log.Printf("server starting on port %s", cfg.AppPort)
+	log.Printf("server starting on :%s", cfg.AppPort)
 	log.Fatal(app.Listen(":" + cfg.AppPort))
 }

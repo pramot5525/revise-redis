@@ -1,9 +1,9 @@
-package models
+package domain
 
 import "time"
 
 type News struct {
-	ID        uint      `json:"id" gorm:"primaryKey"`
+	ID        uint      `json:"id"`
 	Title     string    `json:"title"`
 	Content   string    `json:"content"`
 	Author    string    `json:"author"`
